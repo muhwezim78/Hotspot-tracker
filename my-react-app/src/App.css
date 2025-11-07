@@ -1,0 +1,159 @@
+/* App.css */
+
+/* Reset some margins and padding */
+body, html, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f0f2f5;
+}
+
+/* Layout adjustments */
+.ant-layout {
+  background: #f0f2f5;
+}
+
+.ant-layout-header {
+  background: #fff !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  box-shadow: 0 1px 4px rgba(0,21,41,.08);
+}
+
+.ant-layout-sider {
+  background: #001529 !important;
+}
+
+.ant-layout-sider .ant-menu-item-selected {
+  background-color: #1890ff !important;
+}
+
+/* Sidebar menu */
+.sidebar-menu {
+  padding: 16px 0;
+}
+
+.sidebar-menu-item {
+  padding: 12px 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 0 4px 4px 0;
+  transition: all 0.3s;
+}
+
+.sidebar-menu-item:hover {
+  background-color: rgba(255,255,255,0.1);
+}
+
+.sidebar-menu-item.selected {
+  background: #1890ff;
+  color: #fff;
+  border-right: 3px solid #52c41a;
+}
+
+/* Cards */
+.ant-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+.ant-card-small {
+  padding: 12px;
+}
+
+.ant-card .ant-card-head {
+  font-weight: bold;
+}
+
+.ant-card .ant-card-body {
+  padding: 16px;
+}
+
+/* Typography */
+.ant-typography {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.ant-typography-code {
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* Tables */
+.ant-table {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ant-table-thead > tr > th {
+  background: #fafafa;
+  font-weight: 600;
+}
+
+.ant-table-tbody > tr > td {
+  padding: 12px 16px;
+}
+
+/* Forms */
+.ant-form-item {
+  margin-bottom: 16px;
+}
+
+/* Modals */
+.ant-modal-content {
+  border-radius: 8px;
+}
+
+.ant-modal-header {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.ant-modal-footer {
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Buttons */
+.ant-btn {
+  border-radius: 4px;
+}
+
+.ant-btn-primary {
+  background-color: #1890ff;
+  border-color: #1890ff;
+}
+
+.ant-btn-primary:hover {
+  background-color: #40a9ff;
+  border-color: #40a9ff;
+}
+
+/* Statistic Cards */
+.ant-statistic-content-value {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* Timeline */
+.ant-timeline-item-content {
+  font-size: 14px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .ant-layout {
+    margin-left: 0 !important;
+  }
+
+  .ant-layout-sider {
+    position: relative;
+    height: auto;
+  }
+}
