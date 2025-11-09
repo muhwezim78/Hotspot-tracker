@@ -1,12 +1,14 @@
 /* App.css */
 
 /* Reset some margins and padding */
-body, html, #root {
+body,
+html,
+#root {
   height: 100%;
   width: 100%;
   margin: 0;
   padding: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   background-color: #f0f2f5;
   overflow: auto;
 }
@@ -22,7 +24,7 @@ body, html, #root {
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  box-shadow: 0 1px 4px rgba(0,21,41,.08);
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
 }
 
 .ant-layout-sider {
@@ -49,7 +51,7 @@ body, html, #root {
 }
 
 .sidebar-menu-item:hover {
-  background-color: rgba(255,255,255,0.1);
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .sidebar-menu-item.selected {
@@ -61,7 +63,7 @@ body, html, #root {
 /* Cards */
 .ant-card {
   border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
 .ant-card-small {
@@ -78,7 +80,7 @@ body, html, #root {
 
 /* Typography */
 .ant-typography {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .ant-typography-code {
@@ -157,4 +159,125 @@ body, html, #root {
     position: relative;
     height: auto;
   }
+}
+
+.login-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100%;
+  background-color: #001529;
+  color: white;
+  overflow: auto;
+}
+.login-card {
+  width: 400px;
+  padding: 24px;
+  border-radius: 8px;
+  background-color: #1f1f1f;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  align-items: center;
+}
+.auth-links {
+  align-items: center;
+  justify-content: center;
+}
+.login-form {
+  margin-top: 16px;
+  align-items: center;
+}
+.voucher-access-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100%;
+  background-color: #001529;
+  overflow: auto;
+}
+.voucher-access-card {
+  width: 400px;
+  padding: 24px;
+  border-radius: 8px;
+  background-color: darkred;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  align-items: center;
+  justify-content: center;
+}
+.voucher-access-header {
+  text-align: center;
+  margin-bottom: 24px;
+  justify-content: center;
+  align-items: center;
+}
+.mikrotik-login-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100%;
+  background-color: #001529;
+  overflow: auto;
+}
+.mikrotik-login-card {
+  align-items: center;
+  background-color: #1f1f1f;
+   margin-bottom: 100px;
+}
+.wireguard-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  background-color: #001529;
+  justify-content: center;
+  align-items: center;
+  overflow: auto;
+}
+.container-header{
+  justify-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 350px;
+ 
+}
+.wireguard-card {
+  margin: 10px;
+  padding: 12px;
+  align-items: center;
+  background-color: #fafafa;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  justify-content: center;
+   margin-bottom: 100px;
+}
+.routers-container{
+   display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  background-color: #001529;
+  justify-content: center;
+  align-items: center;
+  overflow: auto;
+}
+.router-card {
+    transition: all 0.3s ease;
+    border-radius: 8px;
+}
+.router-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.ant-card-actions {
+    background: #fafafa;
+}
+
+.ant-card-actions > li:not(:last-child) {
+    border-right: 1px solid #f0f0f0;
 }

@@ -36,7 +36,8 @@ import {
   Popover,
   message,
   Collapse,
-  Watermark
+  Watermark,
+  Menu
 } from 'antd';
 import {
   DollarOutlined,
@@ -77,7 +78,7 @@ const { TabPane } = Tabs;
 const { Countdown, StatisticCard } = Statistic;
 const { Panel } = Collapse;
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'http://localhost:5000';
 
 // Consistent API endpoints with perfect rhyming pattern
 const API_ENDPOINTS = {
@@ -157,7 +158,7 @@ function App() {
       if (autoRefresh) {
         fetchData();
       }
-    }, 1000); // Refresh every 1 second
+    }, 10000); // Refresh every 1 second
     return () => clearInterval(interval);
   }, [autoRefresh]);
 
@@ -201,7 +202,7 @@ function App() {
       const systemData = await systemRes.json();
       setSystemInfo(systemData.system_info || {});
       const expiredData = await expiredVouchersRes.json();
-      setExpiredVouchers(expiredData.expired_vouchers || []);
+      setExpiredVouchers(expiredData.expired_users || []);
       const pricingData = await pricingRes.json();
       setPricingRates(pricingData.base_rates || {});
       const allUsersData = await allUsersRes.json();
@@ -1625,33 +1626,5 @@ function App() {
   );
 }
 
-// Menu component for the sidebar
-const Menu = ({ selectedKeys, onClick, items }) => (
-  <div style={{ padding: '16px 0' }}>
-    {items.map(item => (
-      <div
-        key={item.key}
-        onClick={() => onClick({ key: item.key })}
-        style={{
-          padding: '12px 24px',
-          cursor: 'pointer',
-          background: selectedKeys.includes(item.key) ? '#1890ff' : 'transparent',
-          color: selectedKeys.includes(item.key) ? 'white' : 'rgba(255,255,255,0.65)',
-          margin: '4px 0',
-          borderRadius: '0 4px 4px 0',
-          borderRight: selectedKeys.includes(item.key) ? '3px solid #52c41a' : 'none',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          transition: 'all 0.3s',
-          fontWeight: selectedKeys.includes(item.key) ? '600' : '400',
-        }}
-      >
-        {item.icon}
-        <span>{item.label}</span>
-      </div>
-    ))}
-  </div>
-);
 
 export default App;
