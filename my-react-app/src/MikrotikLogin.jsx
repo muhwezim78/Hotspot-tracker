@@ -11,8 +11,8 @@ const MikroTikLogin = () =>{
     return (
         <div className='mikrotik-login-container'>
             <div className='container-header'>
-                <h1>MikroTik Login</h1>
-                <p>Please enter your MikroTik router credentials to proceed.</p>
+                <h1 style={{ fontWeight: "bold", color: "#007bff"  }}>MikroTik Login</h1>
+                <p style={{ fontWeight: "bold", color: "#007bff"  }}>Please enter your MikroTik router credentials to proceed.</p>
             </div>
             <Card className='mikrotik-login-card'>
                 <Form className='mikrotik-login-form'>

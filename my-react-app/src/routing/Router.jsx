@@ -24,7 +24,6 @@ const lazyWithPrefetch = (importFunc) => {
 
 // Lazy-loaded components
 const App = lazyWithPrefetch(() => import("../App"));
-
 const Login = lazyWithPrefetch(() => import("../Login"));
 const SignUp = lazyWithPrefetch(() => import("../SignUp"));
 const MikroTikLoginRoute = lazyWithPrefetch(() => import("../MikrotikLogin"));
@@ -32,6 +31,8 @@ const VoucherAccess = lazyWithPrefetch(() => import("../VoucherAccess"));
 const WireguardConfig = lazyWithPrefetch(() => import("../WireguardConfig"));
 const Logs = lazyWithPrefetch(() => import("../Logs"));
 const RoutersConnected = lazyWithPrefetch(() => import("../RoutersConnected"))
+const AccessStatus = lazyWithPrefetch(() => import("../AccessStatus"))
+const AccessSuccess = lazyWithPrefetch(() => import("../AccessSuccess"))
 
 
 const AppRoutes = () => {
@@ -53,6 +54,8 @@ const AppRoutes = () => {
         <Route path="wireguard-config" element={<WireguardConfig />} />
         <Route path="routers" element={<RoutersConnected />} />
         <Route path="app" element={<App />}/>
+        <Route path="status" element={<AccessStatus />} />
+        <Route path="success" element={<AccessSuccess />} />
       </Routes>
     </AnimatePresence>
   );

@@ -1,10 +1,18 @@
 import React, { useState } from "react";
-import { Form, Button, Col, Row, Card, Input } from "antd";
+import { Form, Button, Col, Row, Card, Input, Typography, Divider } from "antd";
 import SafeAlert from "@components/Alert";
+import { useNavigate } from "react-router-dom";
+const { Text } = Typography;
 
 const VoucherAccess = () => {
+  const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
-    const [accessError, setAccessError] = useState(null);
+  const [accessError, setAccessError] = useState(null);
+
+  const handleStatus = () => {
+    navigate("/status");
+  };
+
   return (
     <div className="voucher-access-container">
       <div className="voucher-access-header">
@@ -58,6 +66,9 @@ const VoucherAccess = () => {
             >
               Authenticate
             </Button>
+            <Divider/>
+            <Text style={{ fontSize: "bold", color: "white" }}>Check Access Status</Text>
+            <Button onClick={handleStatus}>Status</Button>
           </Form.Item>
           .
         </Form>

@@ -12,12 +12,14 @@
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
     "antd": "^5.28.0",
+    "axios": "^1.13.2",
     "framer-motion": "^12.23.24",
     "prop-types": "^15.8.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.9.5",
-    "recharts": "^3.3.0"
+    "recharts": "^3.3.0",
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
