@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -47,8 +47,6 @@ import {
   QRCode,
   Popover,
   message,
-  Collapse,
-  Watermark,
   Menu,
   theme,
 } from "antd";
@@ -68,87 +66,71 @@ import {
   ClockCircleOutlined,
   ExclamationCircleOutlined,
   EyeOutlined,
-  DeleteOutlined,
   EditOutlined,
   DownloadOutlined,
-  QrcodeOutlined,
   CopyOutlined,
-  SecurityScanOutlined,
-  HistoryOutlined,
+  CloudServerOutlined,
   ThunderboltOutlined,
   DatabaseOutlined,
-  CloudServerOutlined,
-  IdcardOutlined,
-  LockOutlined,
-  UnlockOutlined,
-  ShopOutlined,
   SafetyCertificateOutlined,
+  IdcardOutlined,
+  UnlockOutlined,
+  LockOutlined,
 } from "@ant-design/icons";
 import "./App.css";
-import { io } from "socket.io-client";
-import axios from "axios";
+import ApiService from "./context/api";
 
 const { Header, Content, Sider } = Layout;
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 const { Option } = Select;
 const { TabPane } = Tabs;
 const { useToken } = theme;
 
-const API_BASE = "http://localhost:5000";
-
-// Initialize socket with error handling
-const socket = io(API_BASE, {
-  transports: ["websocket", "polling"],
-  reconnection: true,
-  reconnectionAttempts: 5,
-  reconnectionDelay: 1000,
-});
-
-// Consistent API endpoints
-const API_ENDPOINTS = {
-  // Financial
-  FINANCIAL_STATS: "/financial/stats",
-  FINANCIAL_REVENUE: "/financial/revenue-data",
-  FINANCIAL_PROFILES: "/financial/profile-stats",
-
-  // Vouchers
-  VOUCHERS: "/vouchers/generate",
-  VOUCHERS_EXPIRED: "/vouchers/expired",
-  VOUCHER_DETAIL: "/vouchers",
-
-  // Users
-  USERS: "/all-users",
-  USERS_ACTIVE: "/active-users",
-  USERS_EXPIRED: "/users/expired",
-  USER_DETAIL: "/users",
-  USER_COMMENT: "/users",
-
-  // System
-  SYSTEM_INFO: "/system/info",
-
-  // Pricing
-  PRICING_RATES: "/pricing/rates",
-
-  // Profiles
-  PROFILES: "/profiles/enhanced",
+// Default empty states
+const DEFAULT_STATES = {
+  financialStats: {},
+  revenueData: [],
+  profileStats: [],
+  profiles: [],
+  activeUsers: [],
+  allUsers: [],
+  systemInfo: {},
+  expiredVouchers: [],
+  expiredUsers: [],
+  pricingRates: {},
+  activeRevenueData: {},
+  generatedVouchers: [],
+  voucherHistory: [],
 };
-
-// Configure axios defaults
-axios.defaults.baseURL = API_BASE;
-axios.defaults.timeout = 15000;
 
 function App() {
   const { token } = useToken();
-  const [financialStats, setFinancialStats] = useState({});
-  const [revenueData, setRevenueData] = useState([]);
-  const [profileStats, setProfileStats] = useState([]);
-  const [profiles, setProfiles] = useState([]);
-  const [activeUsers, setActiveUsers] = useState([]);
-  const [allUsers, setAllUsers] = useState([]);
-  const [systemInfo, setSystemInfo] = useState({});
-  const [expiredVouchers, setExpiredVouchers] = useState([]);
-  const [expiredUsers, setExpiredUsers] = useState([]);
-  const [pricingRates, setPricingRates] = useState({});
+
+  // State declarations
+  const [financialStats, setFinancialStats] = useState(
+    DEFAULT_STATES.financialStats
+  );
+  const [revenueData, setRevenueData] = useState(DEFAULT_STATES.revenueData);
+  const [profileStats, setProfileStats] = useState(DEFAULT_STATES.profileStats);
+  const [profiles, setProfiles] = useState(DEFAULT_STATES.profiles);
+  const [activeUsers, setActiveUsers] = useState(DEFAULT_STATES.activeUsers);
+  const [allUsers, setAllUsers] = useState(DEFAULT_STATES.allUsers);
+  const [systemInfo, setSystemInfo] = useState(DEFAULT_STATES.systemInfo);
+  const [expiredVouchers, setExpiredVouchers] = useState(
+    DEFAULT_STATES.expiredVouchers
+  );
+  const [expiredUsers, setExpiredUsers] = useState(DEFAULT_STATES.expiredUsers);
+  const [pricingRates, setPricingRates] = useState(DEFAULT_STATES.pricingRates);
+  const [activeRevenueData, setActiveRevenueData] = useState(
+    DEFAULT_STATES.activeRevenueData
+  );
+  const [generatedVouchers, setGeneratedVouchers] = useState(
+    DEFAULT_STATES.generatedVouchers
+  );
+  const [voucherHistory, setVoucherHistory] = useState(
+    DEFAULT_STATES.voucherHistory
+  );
+
   const [showVoucherForm, setShowVoucherForm] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -160,9 +142,10 @@ function App() {
   const [collapsed, setCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [generatedVouchers, setGeneratedVouchers] = useState([]);
-  const [voucherHistory, setVoucherHistory] = useState([]);
   const [socketConnected, setSocketConnected] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [selectedVouchersForBatch, setSelectedVouchersForBatch] = useState([]);
+
   const [form] = Form.useForm();
   const [pricingForm] = Form.useForm();
   const [voucherForm] = Form.useForm();
@@ -198,18 +181,30 @@ function App() {
       setSocketConnected(false);
     };
 
-    socket.on("connect", handleConnect);
-    socket.on("disconnect", handleDisconnect);
-    socket.on("connect_error", handleConnectError);
+    const handleReconnect = (attemptNumber) => {
+      console.log(`Reconnected after ${attemptNumber} attempts`);
+    };
+
+    // Setup socket listeners
+    const removeConnectListener = ApiService.socket.onConnect(handleConnect);
+    const removeDisconnectListener =
+      ApiService.socket.onDisconnect(handleDisconnect);
+    const removeErrorListener = ApiService.socket.onError(handleConnectError);
+    const removeReconnectListener =
+      ApiService.socket.onReconnect(handleReconnect);
+
+    // Connect to socket
+    ApiService.socket.connect();
 
     return () => {
-      socket.off("connect", handleConnect);
-      socket.off("disconnect", handleDisconnect);
-      socket.off("connect_error", handleConnectError);
+      removeConnectListener();
+      removeDisconnectListener();
+      removeErrorListener();
+      removeReconnectListener();
     };
   }, []);
 
-  // Socket.IO event listeners
+  // Socket.IO event listeners with proper cleanup
   useEffect(() => {
     const handleLiveData = (data) => {
       setFinancialStats(data.financial || {});
@@ -221,7 +216,7 @@ function App() {
 
     const handleUpdateVouchers = (data) => {
       setExpiredVouchers(data.expired || []);
-      setGeneratedVouchers(data.new_vouchers || []);
+      setGeneratedVouchers((prev) => [...(data.new_vouchers || []), ...prev]);
       message.info("Vouchers updated in real-time");
     };
 
@@ -231,18 +226,76 @@ function App() {
       message.info("Users updated in real-time");
     };
 
-    socket.on("live_data", handleLiveData);
-    socket.on("update_vouchers", handleUpdateVouchers);
-    socket.on("update_users", handleUpdateUsers);
+    const handleVoucherGenerated = (data) => {
+      message.info("New voucher generated in real-time");
+      fetchData(); // Refresh data to include new voucher
+    };
+
+    const handleUserConnected = (data) => {
+      message.info(`User ${data.username} connected`);
+      fetchActiveRevenue(); // Refresh active revenue data
+    };
+
+    const handleUserDisconnected = (data) => {
+      message.info(`User ${data.username} disconnected`);
+      fetchActiveRevenue(); // Refresh active revenue data
+    };
+
+    // Setup application-specific socket listeners
+    const removeLiveDataListener = ApiService.socket.onLiveData(handleLiveData);
+    const removeUpdateVouchersListener =
+      ApiService.socket.onUpdateVouchers(handleUpdateVouchers);
+    const removeUpdateUsersListener =
+      ApiService.socket.onUpdateUsers(handleUpdateUsers);
+    const removeVoucherGeneratedListener = ApiService.socket.onVoucherGenerated(
+      handleVoucherGenerated
+    );
+    const removeUserConnectedListener =
+      ApiService.socket.onUserConnected(handleUserConnected);
+    const removeUserDisconnectedListener = ApiService.socket.onUserDisconnected(
+      handleUserDisconnected
+    );
 
     return () => {
-      socket.off("live_data", handleLiveData);
-      socket.off("update_vouchers", handleUpdateVouchers);
-      socket.off("update_users", handleUpdateUsers);
+      removeLiveDataListener();
+      removeUpdateVouchersListener();
+      removeUpdateUsersListener();
+      removeVoucherGeneratedListener();
+      removeUserConnectedListener();
+      removeUserDisconnectedListener();
     };
   }, []);
 
-  // Initial data fetch with axios
+  // Fetch active revenue data
+  const fetchActiveRevenue = useCallback(async () => {
+    try {
+      const data = await ApiService.financial.getActiveRevenue();
+      setActiveRevenueData(data.data || data);
+      return data.data || data;
+    } catch (error) {
+      console.error("Error fetching active revenue:", error);
+      const errorData = {
+        active_users_count: 0,
+        daily_revenue: 0,
+        note: "Failed to fetch active revenue data",
+      };
+      setActiveRevenueData(errorData);
+      return errorData;
+    }
+  }, []);
+
+  // Auto-refresh for active revenue
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = setInterval(async () => {
+      await fetchActiveRevenue();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, fetchActiveRevenue]);
+
+  // Initial data fetch
   useEffect(() => {
     fetchData();
   }, []);
@@ -252,21 +305,26 @@ function App() {
       setLoading(true);
 
       const requests = [
-        axios.get(API_ENDPOINTS.FINANCIAL_STATS),
-        axios.get(`${API_ENDPOINTS.FINANCIAL_REVENUE}?days=30`),
-        axios.get(API_ENDPOINTS.PROFILES),
-        axios.get(API_ENDPOINTS.FINANCIAL_PROFILES),
-        axios.get(API_ENDPOINTS.USERS_ACTIVE),
-        axios.get(API_ENDPOINTS.SYSTEM_INFO),
-        axios.get(API_ENDPOINTS.VOUCHERS_EXPIRED),
-        axios.get(API_ENDPOINTS.PRICING_RATES),
-        axios.get(API_ENDPOINTS.USERS),
-        axios.get(API_ENDPOINTS.USERS_EXPIRED),
+        ApiService.financial.getStats(),
+        ApiService.financial.getRevenueData(30),
+        ApiService.financial.getActiveRevenue(),
+        ApiService.profiles.getEnhanced(),
+        ApiService.financial.getProfileStats(),
+        ApiService.users.getActive(),
+        ApiService.system.getInfo(),
+        ApiService.vouchers.getExpired(),
+        ApiService.pricing.getRates(),
+        ApiService.users.getAll(),
+        ApiService.users.getExpired(),
       ];
 
+      const responses = await Promise.allSettled(requests);
+
+      // Process responses with error handling
       const [
         statsRes,
         revenueRes,
+        activeRevenueRes,
         profilesRes,
         profileStatsRes,
         activeRes,
@@ -275,41 +333,111 @@ function App() {
         pricingRes,
         allUsersRes,
         expiredUsersRes,
-      ] = await Promise.all(requests);
+      ] = responses;
 
-      setFinancialStats(statsRes.data || {});
-      setRevenueData(revenueRes.data?.revenue_data || []);
-      setProfiles(profilesRes.data?.profiles || []);
-      setProfileStats(profileStatsRes.data?.profile_stats || []);
-      setActiveUsers(activeRes.data?.active_users || []);
-      setSystemInfo(systemRes.data?.system_info || {});
-      setExpiredVouchers(expiredVouchersRes.data?.expired_users || []);
-      setPricingRates(pricingRes.data?.base_rates || {});
-      setAllUsers(allUsersRes.data?.all_users || []);
-      setExpiredUsers(expiredUsersRes.data?.expired_users || []);
+      // Update states with proper fallbacks
+      setFinancialStats(
+        statsRes.status === "fulfilled"
+          ? statsRes.value.data || statsRes.value || {}
+          : {}
+      );
+      setRevenueData(
+        revenueRes.status === "fulfilled"
+          ? revenueRes.value.data?.revenue_data ||
+              revenueRes.value?.revenue_data ||
+              []
+          : []
+      );
+      setActiveRevenueData(
+        activeRevenueRes.status === "fulfilled"
+          ? activeRevenueRes.value.data || activeRevenueRes.value || {}
+          : {}
+      );
+      setProfiles(
+        profilesRes.status === "fulfilled"
+          ? profilesRes.value.data?.profiles ||
+              profilesRes.value?.profiles ||
+              []
+          : []
+      );
+      setProfileStats(
+        profileStatsRes.status === "fulfilled"
+          ? profileStatsRes.value.data?.profile_stats ||
+              profileStatsRes.value?.profile_stats ||
+              []
+          : []
+      );
+      setActiveUsers(
+        activeRes.status === "fulfilled"
+          ? activeRes.value.data?.active_users ||
+              activeRes.value?.active_users ||
+              []
+          : []
+      );
+      setSystemInfo(
+        systemRes.status === "fulfilled"
+          ? systemRes.value.data?.system_info ||
+              systemRes.value?.system_info ||
+              {}
+          : {}
+      );
+      setExpiredVouchers(
+        expiredVouchersRes.status === "fulfilled"
+          ? expiredVouchersRes.value.data?.expired_users ||
+              expiredVouchersRes.value?.expired_users ||
+              []
+          : []
+      );
+      setPricingRates(
+        pricingRes.status === "fulfilled"
+          ? pricingRes.value.data?.base_rates ||
+              pricingRes.value?.base_rates ||
+              {}
+          : {}
+      );
+      setAllUsers(
+        allUsersRes.status === "fulfilled"
+          ? allUsersRes.value.data?.all_users ||
+              allUsersRes.value?.all_users ||
+              []
+          : []
+      );
+      setExpiredUsers(
+        expiredUsersRes.status === "fulfilled"
+          ? expiredUsersRes.value.data?.expired_users ||
+              expiredUsersRes.value?.expired_users ||
+              []
+          : []
+      );
 
       setLastUpdated(new Date());
       message.success("Data refreshed successfully");
     } catch (error) {
-      console.error("Error details:", {
-        message: error.message,
-        code: error.code,
-        response: error.response?.data,
-      });
+      console.error("Error fetching data:", error);
       message.error("Failed to fetch data from server");
 
-      // Set default empty values
-    setFinancialStats({});
-    setRevenueData([]);
-    setProfiles([]);
-    setProfileStats([]);
-    setActiveUsers([]);
-    setSystemInfo({});
-    setExpiredVouchers([]);
-    setPricingRates({});
-    setAllUsers([]);
-    setExpiredUsers([]);
+      // Reset all states to defaults on error
+      Object.keys(DEFAULT_STATES).forEach((key) => {
+        const setter = {
+          financialStats: setFinancialStats,
+          revenueData: setRevenueData,
+          profileStats: setProfileStats,
+          profiles: setProfiles,
+          activeUsers: setActiveUsers,
+          allUsers: setAllUsers,
+          systemInfo: setSystemInfo,
+          expiredVouchers: setExpiredVouchers,
+          expiredUsers: setExpiredUsers,
+          pricingRates: setPricingRates,
+          activeRevenueData: setActiveRevenueData,
+          generatedVouchers: setGeneratedVouchers,
+          voucherHistory: setVoucherHistory,
+        }[key];
 
+        if (setter) {
+          setter(DEFAULT_STATES[key]);
+        }
+      });
     } finally {
       setLoading(false);
     }
@@ -317,23 +445,40 @@ function App() {
 
   const generateVouchers = async (values) => {
     try {
-      const response = await axios.post(API_ENDPOINTS.VOUCHERS, values);
-      const result = response.data;
+      const result = await ApiService.vouchers.generate(values);
 
-      setGeneratedVouchers(result.vouchers || []);
+      setGeneratedVouchers(result.vouchers || result.data?.vouchers || []);
+
+      if (
+        values.generate_pdf &&
+        (result.vouchers || result.data?.vouchers) &&
+        (result.vouchers || result.data?.vouchers).length > 0
+      ) {
+        const vouchers = result.vouchers || result.data?.vouchers;
+        if (vouchers.length === 1) {
+          setTimeout(() => {
+            generateSingleVoucherPDF(vouchers[0].code, "standard");
+          }, 1000);
+        } else {
+          const voucherCodes = vouchers.map((v) => v.code);
+          setTimeout(() => {
+            generateBatchVoucherPDF(voucherCodes);
+          }, 1000);
+        }
+      }
 
       Modal.success({
         title: "Vouchers Generated Successfully!",
         content: (
           <div>
             <p>
-              <strong>{result.message}</strong>
+              <strong>{result.message || result.data?.message}</strong>
             </p>
             <Divider />
             <Text strong>Generated Vouchers:</Text>
             <List
               size="small"
-              dataSource={result.vouchers}
+              dataSource={result.vouchers || result.data?.vouchers || []}
               renderItem={(item) => (
                 <List.Item>
                   <Space>
@@ -349,6 +494,14 @@ function App() {
                         message.success("Copied to clipboard!");
                       }}
                     />
+                    <Button
+                      icon={<DownloadOutlined />}
+                      size="small"
+                      onClick={() => generateSingleVoucherPDF(item.code)}
+                      loading={pdfLoading}
+                    >
+                      PDF
+                    </Button>
                   </Space>
                 </List.Item>
               )}
@@ -356,20 +509,49 @@ function App() {
             />
             <Divider />
             <Text strong>
-              Total Amount: {result.total_price?.toLocaleString()} UGX
+              Total Amount:{" "}
+              {(
+                result.total_price ||
+                result.data?.total_price ||
+                0
+              )?.toLocaleString()}{" "}
+              UGX
             </Text>
+            {(result.vouchers || result.data?.vouchers) &&
+              (result.vouchers || result.data?.vouchers).length > 1 && (
+                <>
+                  <Divider />
+                  <Button
+                    type="primary"
+                    icon={<DownloadOutlined />}
+                    onClick={() =>
+                      generateBatchVoucherPDF(
+                        (result.vouchers || result.data?.vouchers).map(
+                          (v) => v.code
+                        )
+                      )
+                    }
+                    loading={pdfLoading}
+                    block
+                  >
+                    Download All as Batch PDF
+                  </Button>
+                </>
+              )}
           </div>
         ),
-        width: 600,
+        width: 700,
       });
 
       setShowVoucherForm(false);
       voucherForm.resetFields();
       fetchData();
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Error generating vouchers:", error);
       const errorMessage =
-        error.response?.data?.error || "Error generating vouchers";
+        error.error ||
+        error.response?.data?.error ||
+        "Error generating vouchers";
       Modal.error({
         title: "Error",
         content: errorMessage,
@@ -377,24 +559,72 @@ function App() {
     }
   };
 
+  // PDF Generation Functions
+  const generateSingleVoucherPDF = async (voucherCode, style = "standard") => {
+    try {
+      setPdfLoading(true);
+
+      const blob = await ApiService.vouchers.generatePDF(
+        voucherCode,
+        style,
+        true
+      );
+      ApiService.utils.downloadBlob(blob, `voucher_${voucherCode}.pdf`);
+
+      message.success(`PDF for ${voucherCode} generated successfully!`);
+    } catch (error) {
+      console.error("PDF generation error:", error);
+      message.error("Failed to generate PDF");
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+  const generateBatchVoucherPDF = async (voucherCodes) => {
+    if (!voucherCodes || voucherCodes.length === 0) {
+      message.warning("Please select vouchers to generate batch PDF");
+      return;
+    }
+
+    try {
+      setPdfLoading(true);
+
+      const blob = await ApiService.vouchers.generateBatchPDF(
+        voucherCodes,
+        true
+      );
+      ApiService.utils.downloadBlob(
+        blob,
+        `batch_vouchers_${voucherCodes.length}.pdf`
+      );
+
+      message.success(
+        `Batch PDF for ${voucherCodes.length} vouchers generated successfully!`
+      );
+    } catch (error) {
+      console.error("Batch PDF generation error:", error);
+      message.error("Failed to generate batch PDF");
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   const updatePricingRates = async (values) => {
     try {
-      await axios.put(API_ENDPOINTS.PRICING_RATES, { rates: values });
+      await ApiService.pricing.updateRates(values);
       message.success("Pricing rates updated successfully!");
       setShowPricingModal(false);
       fetchData();
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Error updating pricing rates:", error);
       message.error("Error updating pricing rates");
     }
   };
 
   const getVoucherInfo = async (voucherCode) => {
     try {
-      const response = await axios.get(
-        `${API_ENDPOINTS.VOUCHER_DETAIL}/${voucherCode}`
-      );
-      setSelectedVoucher(response.data);
+      const response = await ApiService.vouchers.getDetail(voucherCode);
+      setSelectedVoucher(response.data || response);
       setVoucherModalVisible(true);
     } catch (error) {
       console.error("Error fetching voucher info:", error);
@@ -404,10 +634,8 @@ function App() {
 
   const getUserInfo = async (username) => {
     try {
-      const response = await axios.get(
-        `${API_ENDPOINTS.USER_DETAIL}/${username}`
-      );
-      setSelectedUser(response.data);
+      const response = await ApiService.users.getDetail(username);
+      setSelectedUser(response.data || response);
       setUserModalVisible(true);
     } catch (error) {
       console.error("Error fetching user info:", error);
@@ -417,13 +645,11 @@ function App() {
 
   const updateUserComment = async (username, comment) => {
     try {
-      await axios.put(`${API_ENDPOINTS.USER_COMMENT}/${username}/comments`, {
-        comment,
-      });
+      await ApiService.users.updateComment(username, comment);
       message.success("Comment updated successfully!");
       fetchData();
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Error updating user comment:", error);
       message.error("Error updating comment");
     }
   };
@@ -439,18 +665,51 @@ function App() {
       .join("\n");
 
     const blob = new Blob([content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `vouchers-${new Date().toISOString().split("T")[0]}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    ApiService.utils.downloadBlob(
+      blob,
+      `vouchers-${new Date().toISOString().split("T")[0]}.txt`
+    );
 
     message.success("Vouchers exported successfully!");
   };
 
+  const clearGeneratedVouchers = () => {
+    setGeneratedVouchers([]);
+    message.success("Generated vouchers cleared");
+  };
+
+  const resetAllData = () => {
+    Modal.confirm({
+      title: "Reset All Data",
+      content: "Are you sure you want to reset all data to default values?",
+      onOk: () => {
+        Object.keys(DEFAULT_STATES).forEach((key) => {
+          const setter = {
+            financialStats: setFinancialStats,
+            revenueData: setRevenueData,
+            profileStats: setProfileStats,
+            profiles: setProfiles,
+            activeUsers: setActiveUsers,
+            allUsers: setAllUsers,
+            systemInfo: setSystemInfo,
+            expiredVouchers: setExpiredVouchers,
+            expiredUsers: setExpiredUsers,
+            pricingRates: setPricingRates,
+            activeRevenueData: setActiveRevenueData,
+            generatedVouchers: setGeneratedVouchers,
+            voucherHistory: setVoucherHistory,
+          }[key];
+
+          if (setter) {
+            setter(DEFAULT_STATES[key]);
+          }
+        });
+        message.success("All data reset successfully");
+      },
+    });
+  };
+
+  // Helper functions
   const COLORS = [
     "#0088FE",
     "#00C49F",
@@ -460,6 +719,39 @@ function App() {
     "#82ca9d",
   ];
 
+  const getProfileColor = (name) => {
+    if (!name) return token.colorWarning;
+    if (name.toLowerCase().includes("day")) return token.colorPrimary;
+    if (name.toLowerCase().includes("week")) return token.colorSuccess;
+    if (name.toLowerCase().includes("month")) return token.colorPurple;
+    return token.colorWarning;
+  };
+
+  const getProfileStatusColor = (name) => {
+    if (!name) return "orange";
+    if (name.toLowerCase().includes("day")) return "blue";
+    if (name.toLowerCase().includes("week")) return "green";
+    if (name.toLowerCase().includes("month")) return "purple";
+    return "orange";
+  };
+
+  const getProfileType = (name) => {
+    if (!name) return "CUSTOM";
+    if (name.toLowerCase().includes("day")) return "DAILY";
+    if (name.toLowerCase().includes("week")) return "WEEKLY";
+    if (name.toLowerCase().includes("month")) return "MONTHLY";
+    return "CUSTOM";
+  };
+
+  const getProfileUsage = (name) => {
+    return Math.floor(Math.random() * 100);
+  };
+
+  const formatBytes = (bytes) => {
+    return ApiService.utils.formatBytes(bytes);
+  };
+
+  // Table columns
   const activeUsersColumns = [
     {
       title: "Username",
@@ -474,12 +766,14 @@ function App() {
           >
             <Tag
               icon={<UserOutlined />}
-              color={text.startsWith("VOUCHER") ? "blue" : "purple"}
+              color={text && text.startsWith("VOUCHER") ? "blue" : "purple"}
             >
-              {text}
+              {text || "Unknown"}
             </Tag>
           </Button>
-          {text.startsWith("VOUCHER") && <Tag color="cyan">Voucher</Tag>}
+          {text && text.startsWith("VOUCHER") && (
+            <Tag color="cyan">Voucher</Tag>
+          )}
         </Space>
       ),
     },
@@ -487,25 +781,23 @@ function App() {
       title: "Profile",
       dataIndex: "profile",
       key: "profile",
-      render: (text) => <Tag color="orange">{text}</Tag>,
+      render: (text) => <Tag color="orange">{text || "Unknown"}</Tag>,
     },
     {
       title: "Uptime",
       dataIndex: "uptime",
       key: "uptime",
-      render: (uptime) => <Tag color="green">{uptime}</Tag>,
+      render: (uptime) => <Tag color="green">{uptime || "Unknown"}</Tag>,
     },
     {
       title: "Data Usage",
       key: "data-usage",
       render: (_, record) => (
         <Text type="secondary">
-          {(
-            (parseInt(record["bytes-in"] || 0) +
-              parseInt(record["bytes-out"] || 0)) /
-            (1024 * 1024)
-          ).toFixed(2)}{" "}
-          MB
+          {formatBytes(
+            parseInt(record["bytes-in"] || 0) +
+              parseInt(record["bytes-out"] || 0)
+          )}
         </Text>
       ),
     },
@@ -513,6 +805,7 @@ function App() {
       title: "Server",
       dataIndex: "server",
       key: "server",
+      render: (text) => text || "Unknown",
     },
   ];
 
@@ -528,7 +821,7 @@ function App() {
             onClick={() => getUserInfo(text)}
             icon={<EyeOutlined />}
           >
-            <Text strong>{text}</Text>
+            <Text strong>{text || "Unknown"}</Text>
           </Button>
           {record.is_voucher && <Tag color="blue">Voucher</Tag>}
           {record.password_type && (
@@ -543,7 +836,7 @@ function App() {
       title: "Profile",
       dataIndex: "profile_name",
       key: "profile_name",
-      render: (text) => <Tag color="orange">{text}</Tag>,
+      render: (text) => <Tag color="orange">{text || "Unknown"}</Tag>,
     },
     {
       title: "Status",
@@ -572,6 +865,7 @@ function App() {
       title: "Uptime Limit",
       dataIndex: "uptime_limit",
       key: "uptime_limit",
+      render: (text) => text || "Unlimited",
     },
     {
       title: "Actions",
@@ -602,7 +896,7 @@ function App() {
       key: "voucher_code",
       render: (text) => (
         <Text code strong>
-          {text}
+          {text || "Unknown"}
         </Text>
       ),
     },
@@ -610,6 +904,7 @@ function App() {
       title: "Profile",
       dataIndex: "profile_name",
       key: "profile_name",
+      render: (text) => text || "Unknown",
     },
     {
       title: "Activated At",
@@ -625,12 +920,13 @@ function App() {
       title: "Current Uptime",
       dataIndex: "current_uptime",
       key: "current_uptime",
-      render: (text) => <Tag color="orange">{text}</Tag>,
+      render: (text) => <Tag color="orange">{text || "Unknown"}</Tag>,
     },
     {
       title: "Uptime Limit",
       dataIndex: "uptime_limit",
       key: "uptime_limit",
+      render: (text) => text || "Unlimited",
     },
     {
       title: "Status",
@@ -649,6 +945,7 @@ function App() {
     },
   ];
 
+  // Component definitions
   const ProfileCard = ({ profile }) => (
     <Card
       size="small"
@@ -659,13 +956,13 @@ function App() {
       }}
       actions={[
         <Text key="price" strong style={{ color: token.colorPrimary }}>
-          {profile.price?.toLocaleString()} UGX
+          {profile.price?.toLocaleString() || 0} UGX
         </Text>,
         <Text key="limit" type="secondary">
-          {profile.time_limit}
+          {profile.time_limit || "No limit"}
         </Text>,
         <Tag key="uptime" color="blue">
-          {profile.uptime_limit}
+          {profile.uptime_limit || "Unlimited"}
         </Tag>,
       ]}
     >
@@ -677,7 +974,7 @@ function App() {
         }
         title={
           <Space>
-            <Text strong>{profile.name}</Text>
+            <Text strong>{profile.name || "Unknown Profile"}</Text>
             <Tag color={getProfileStatusColor(profile.name)}>
               {getProfileType(profile.name)}
             </Tag>
@@ -685,8 +982,12 @@ function App() {
         }
         description={
           <Space direction="vertical" size={0} style={{ width: "100%" }}>
-            <Text type="secondary">Rate Limit: {profile.rate_limit}</Text>
-            <Text type="secondary">Data: {profile.data_limit}</Text>
+            <Text type="secondary">
+              Rate Limit: {profile.rate_limit || "Unlimited"}
+            </Text>
+            <Text type="secondary">
+              Data: {profile.data_limit || "Unlimited"}
+            </Text>
             <Progress
               percent={getProfileUsage(profile.name)}
               size="small"
@@ -720,6 +1021,12 @@ function App() {
               text={systemInfo.router_name || "Unknown"}
             />
           </Descriptions.Item>
+          <Descriptions.Item label="Model">
+            <Tag color="blue" icon={<CloudServerOutlined />}>
+              {systemInfo.model || "Unknown"}
+              {systemInfo.architecture && ` (${systemInfo.architecture})`}
+            </Tag>
+          </Descriptions.Item>
           <Descriptions.Item label="CPU Load">
             <Progress
               percent={parseInt(systemInfo.cpu_load) || 0}
@@ -749,6 +1056,13 @@ function App() {
           <Descriptions.Item label="CPU Cores">
             <Tag>{systemInfo.cpu_count || "1"}</Tag>
           </Descriptions.Item>
+          {systemInfo.serial_number && (
+            <Descriptions.Item label="Serial No.">
+              <Text type="secondary" style={{ fontSize: "10px" }}>
+                {systemInfo.serial_number}
+              </Text>
+            </Descriptions.Item>
+          )}
         </Descriptions>
       </Space>
     </Card>
@@ -797,39 +1111,53 @@ function App() {
     </Card>
   );
 
-  // Helper functions
-  const getProfileColor = (name) => {
-    if (name.toLowerCase().includes("day")) return token.colorPrimary;
-    if (name.toLowerCase().includes("week")) return token.colorSuccess;
-    if (name.toLowerCase().includes("month")) return token.colorPurple;
-    return token.colorWarning;
-  };
-
-  const getProfileStatusColor = (name) => {
-    if (name.toLowerCase().includes("day")) return "blue";
-    if (name.toLowerCase().includes("week")) return "green";
-    if (name.toLowerCase().includes("month")) return "purple";
-    return "orange";
-  };
-
-  const getProfileType = (name) => {
-    if (name.toLowerCase().includes("day")) return "DAILY";
-    if (name.toLowerCase().includes("week")) return "WEEKLY";
-    if (name.toLowerCase().includes("month")) return "MONTHLY";
-    return "CUSTOM";
-  };
-
-  const getProfileUsage = (name) => {
-    return Math.floor(Math.random() * 100);
-  };
-
-  const formatBytes = (bytes) => {
-    if (!bytes) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
+  const RealTimeRevenueCard = () => (
+    <Card
+      title={
+        <Space>
+          <ThunderboltOutlined />
+          Real-time Active Revenue
+          <Badge status="processing" text="Live" />
+        </Space>
+      }
+      style={{ background: token.colorBgContainer }}
+      extra={
+        <Button
+          icon={<ReloadOutlined />}
+          size="small"
+          onClick={fetchActiveRevenue}
+        >
+          Refresh
+        </Button>
+      }
+    >
+      <Row gutter={16}>
+        <Col span={12}>
+          <Statistic
+            title="Active Users"
+            value={activeRevenueData.active_users_count || 0}
+            valueStyle={{ color: token.colorInfo }}
+          />
+        </Col>
+        <Col span={12}>
+          <Statistic
+            title="Today's Revenue"
+            value={activeRevenueData.daily_revenue || 0}
+            valueStyle={{ color: token.colorSuccess }}
+            suffix="UGX"
+          />
+        </Col>
+      </Row>
+      {activeRevenueData.note && (
+        <Alert
+          message={activeRevenueData.note}
+          type="info"
+          showIcon
+          style={{ marginTop: 16 }}
+        />
+      )}
+    </Card>
+  );
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -1041,6 +1369,16 @@ function App() {
                       <Col xs={24} sm={12} lg={6}>
                         <Card style={{ background: token.colorBgContainer }}>
                           <Statistic
+                            title="Active Users"
+                            value={activeRevenueData.active_users_count || 0}
+                            prefix={<TeamOutlined />}
+                            valueStyle={{ color: token.colorInfo }}
+                          />
+                        </Card>
+                      </Col>
+                      <Col xs={24} sm={12} lg={6}>
+                        <Card style={{ background: token.colorBgContainer }}>
+                          <Statistic
                             title="Active Vouchers"
                             value={financialStats.active_vouchers || 0}
                             prefix={<RocketOutlined />}
@@ -1071,46 +1409,7 @@ function App() {
                   </Col>
 
                   <Col xs={24} lg={8}>
-                    <Card
-                      title="Recent Activity"
-                      size="small"
-                      style={{ background: token.colorBgContainer }}
-                    >
-                      <Timeline>
-                        <Timeline.Item
-                          color="green"
-                          dot={<ThunderboltOutlined />}
-                        >
-                          <Text strong>System Operational</Text>
-                          <br />
-                          <Text type="secondary">
-                            All services running normally
-                          </Text>
-                        </Timeline.Item>
-                        <Timeline.Item color="blue" dot={<TeamOutlined />}>
-                          <Text strong>
-                            {activeUsers.length} Active Connections
-                          </Text>
-                          <br />
-                          <Text type="secondary">
-                            {allUsers.length} total users in system
-                          </Text>
-                        </Timeline.Item>
-                        <Timeline.Item color="orange" dot={<RocketOutlined />}>
-                          <Text strong>
-                            {financialStats.used_vouchers_today || 0} Vouchers
-                            Used Today
-                          </Text>
-                          <br />
-                          <Text type="secondary">
-                            {(
-                              financialStats.daily_revenue || 0
-                            ).toLocaleString()}{" "}
-                            UGX revenue
-                          </Text>
-                        </Timeline.Item>
-                      </Timeline>
-                    </Card>
+                    <RealTimeRevenueCard />
                   </Col>
 
                   {/* Charts */}
@@ -1309,7 +1608,7 @@ function App() {
                         <Table
                           dataSource={activeUsers}
                           columns={activeUsersColumns}
-                          rowKey={(record, index) => index}
+                          rowKey={(record, index) => `active-${index}`}
                           pagination={{ pageSize: 10 }}
                           size="middle"
                         />
@@ -1691,6 +1990,19 @@ function App() {
                 label="Customer Contact (Optional)"
               >
                 <Input placeholder="Enter contact information" size="large" />
+              </Form.Item>
+
+              <Form.Item
+                name="generate_pdf"
+                valuePropName="checked"
+                label="Generate PDF"
+                extra="Automatically generate PDF files for created vouchers"
+              >
+                <Switch
+                  checkedChildren="Yes"
+                  unCheckedChildren="No"
+                  defaultChecked={false}
+                />
               </Form.Item>
             </Col>
           </Row>
